@@ -24,15 +24,41 @@ class _NotesListState extends State<NotesList> {
     // Note(title: 'Note 2', description: 'Description 2'),
   ];
   Future getNotes() async {
-    this.myNotes = await DBHelper.instance.showNotes();
+    var n = await DBHelper.instance.showNotes();
+    setState(() {
+      myNotes.addAll(n);
+    });
   }
 
-  Future addNote() async {
-    final note = Note(
-        title: noteTitleController.text,
-        description: noteDescriptionController.text,
-        createdDate: DateTime.now());
-    await DBHelper.instance.create(note);
+  Future searchNotes() async {
+    var d = await DBHelper.instance.searchNotes('title');
+    myNotes.clear();
+    myNotes.addAll(d);
+    print(d);
+  }
+
+  Future addNote([bool? isEdit, int? index]) async {
+    if (isEdit != null) {
+      final note = Note(
+          id: myNotes[index!].id,
+          title: noteTitleController.text,
+          description: noteDescriptionController.text,
+          createdDate: DateTime.now());
+      int a = await DBHelper.instance.update(note);
+      setState(() {
+        myNotes[index] = note;
+      });
+    } else {
+      final note = Note(
+          // id: isEdit == null? null : id,
+          title: noteTitleController.text,
+          description: noteDescriptionController.text,
+          createdDate: DateTime.now());
+      Note n = await DBHelper.instance.create(note);
+      setState(() {
+        myNotes.add(n);
+      });
+    }
   }
 
   @override
@@ -46,6 +72,7 @@ class _NotesListState extends State<NotesList> {
   @override
   void initState() {
     getNotes();
+    searchNotes();
     // TODO: implement initState
     super.initState();
   }
@@ -83,7 +110,8 @@ class _NotesListState extends State<NotesList> {
                 ),
                 IconButton(
                   icon: Icon(Icons.delete),
-                  onPressed: () {
+                  onPressed: () async {
+                    await DBHelper.instance.delete(myNotes[index].id!);
                     setState(() {
                       myNotes.removeAt(index);
                     });
@@ -139,7 +167,7 @@ class _NotesListState extends State<NotesList> {
                           onTap: () {
                             print('test');
                             if (formKey.currentState!.validate()) {
-                              addNote();
+                              addNote(isEdit, index);
                               Navigator.pop(context);
                               // Note n = Note(
                               //     title: noteTitleController.text,
