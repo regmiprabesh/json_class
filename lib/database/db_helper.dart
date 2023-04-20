@@ -10,7 +10,7 @@ class DBHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDb('newnotes.db');
+    _database = await _initDb('newnot.db');
     return _database!;
   }
 
@@ -29,6 +29,7 @@ CREATE TABLE $tableNotes (
   ${NotesFields.id} INTEGER PRIMARY KEY AUTOINCREMENT, 
   ${NotesFields.title} $textType,
   ${NotesFields.description} $textType,
+  ${NotesFields.isDeleted} INTEGER,
   ${NotesFields.time} $textType
   )
 ''');
@@ -43,14 +44,28 @@ CREATE TABLE $tableNotes (
 
   Future<List<Note>> showNotes() async {
     final db = await instance.database;
-    final result = await db.query(tableNotes);
+    final result = await db.query(tableNotes,
+        where: '${NotesFields.isDeleted} = ?', whereArgs: [0]);
     return result.map((e) => Note.fromJson(e)).toList();
+  }
+
+  Future<List<Note>> showDeletedNotes() async {
+    final db = await instance.database;
+    final result = await db.query(tableNotes,
+        where: '${NotesFields.isDeleted} = ?', whereArgs: [1]);
+    return result.map((e) => Note.fromJson(e)).toList();
+  }
+
+  Future<int> temporaryDelete(Note note) async {
+    final db = await instance.database;
+    return db.update(tableNotes, note.toJson(),
+        where: '${NotesFields.id} = ?', whereArgs: [note.id]);
   }
 
   Future<List<Note>> searchNotes(String title) async {
     final db = await instance.database;
     final result = await db.query(tableNotes,
-        where: '${NotesFields.title} = ?', whereArgs: [title]);
+        where: '${NotesFields.title} LIKE ?', whereArgs: ['%$title%']);
     return result.map((e) => Note.fromJson(e)).toList();
   }
 

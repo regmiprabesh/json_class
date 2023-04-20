@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/src/widgets/container.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:json_class/database/db_helper.dart';
+import 'package:json_class/deleted_notes.dart';
 import 'package:json_class/model/note.dart';
 import 'package:http/http.dart';
 
@@ -19,10 +20,7 @@ class _NotesListState extends State<NotesList> {
   var formKey = GlobalKey<FormState>();
   TextEditingController noteTitleController = TextEditingController();
   TextEditingController noteDescriptionController = TextEditingController();
-  late List<Note> myNotes = [
-    // Note(title: 'Note 1', description: 'Description 1'),
-    // Note(title: 'Note 2', description: 'Description 2'),
-  ];
+  late List<Note> myNotes = [];
   Future getNotes() async {
     var n = await DBHelper.instance.showNotes();
     setState(() {
@@ -30,35 +28,40 @@ class _NotesListState extends State<NotesList> {
     });
   }
 
-  Future searchNotes() async {
-    var d = await DBHelper.instance.searchNotes('title');
-    myNotes.clear();
-    myNotes.addAll(d);
-    print(d);
+  Future searchNotes(String query) async {
+    var d = await DBHelper.instance.searchNotes(query);
+    setState(() {
+      myNotes.clear();
+      myNotes.addAll(d);
+    });
   }
 
-  Future addNote([bool? isEdit, int? index]) async {
-    if (isEdit != null) {
-      final note = Note(
-          id: myNotes[index!].id,
-          title: noteTitleController.text,
-          description: noteDescriptionController.text,
-          createdDate: DateTime.now());
-      int a = await DBHelper.instance.update(note);
-      setState(() {
-        myNotes[index] = note;
-      });
-    } else {
-      final note = Note(
-          // id: isEdit == null? null : id,
-          title: noteTitleController.text,
-          description: noteDescriptionController.text,
-          createdDate: DateTime.now());
-      Note n = await DBHelper.instance.create(note);
-      setState(() {
-        myNotes.add(n);
-      });
-    }
+  Future addNote() async {
+    final note = Note(
+        title: noteTitleController.text,
+        description: noteDescriptionController.text,
+        isDeleted: false,
+        createdDate: DateTime.now());
+    Note n = await DBHelper.instance.create(note);
+    setState(() {
+      myNotes.add(n);
+    });
+    noteTitleController.clear();
+    noteDescriptionController.clear();
+  }
+
+  Future editNote([bool? isEdit, int? index]) async {
+    final note = Note(
+        id: myNotes[index!].id,
+        title: noteTitleController.text,
+        description: noteDescriptionController.text,
+        createdDate: DateTime.now());
+    int a = await DBHelper.instance.update(note);
+    setState(() {
+      myNotes[index] = note;
+    });
+    noteTitleController.clear();
+    noteDescriptionController.clear();
   }
 
   @override
@@ -72,64 +75,89 @@ class _NotesListState extends State<NotesList> {
   @override
   void initState() {
     getNotes();
-    searchNotes();
     // TODO: implement initState
     super.initState();
   }
 
-  // {'title': '', 'description': 'This is Description'},
-  // var myArray = ['title', 'description', 'priority'];
   @override
   Widget build(BuildContext context) {
-    // Note myNote = Note.fromJson(jsonData);
-    // return Center(
-    //   child: Text(myNote.description!.desc2),
-    // );
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showAddNote(context);
-        },
-        child: Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            backgroundColor: Colors.red,
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: ((context) {
+                return DeletedNotes();
+              })));
+            },
+            child: Icon(Icons.delete),
+            heroTag: null,
+          ),
+          SizedBox(
+            height: 10,
+          ),
+          FloatingActionButton(
+            onPressed: () {
+              _showAddNote(context);
+            },
+            child: Icon(Icons.add),
+            heroTag: null,
+          ),
+        ],
       ),
-      body: ListView.builder(
-        itemCount: myNotes.length,
-        itemBuilder: (context, index) {
-          return ListTile(
-            title: Text(myNotes[index].title!),
-            subtitle: Text(myNotes[index].description!),
-            trailing: Wrap(
-              spacing: 10.0,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.edit),
-                  onPressed: () {
-                    _showAddNote(context, true, index);
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete),
-                  onPressed: () async {
-                    await DBHelper.instance.delete(myNotes[index].id!);
-                    setState(() {
-                      myNotes.removeAt(index);
-                    });
-                  },
-                )
-              ],
+      body: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 15),
+            child: TextFormField(
+              onChanged: (value) {
+                searchNotes(value);
+              },
+              decoration: InputDecoration(hintText: 'Search'),
             ),
-          );
-          // return Card(
-          //   child: Column(
-          //     crossAxisAlignment: CrossAxisAlignment.start,
-          //     children: [
-          //       Text(myNotes[index].title!),
-          //       Text(myNotes[index].description!)
-          //     ],
-          //   ),
-          // );
-        },
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: myNotes.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(myNotes[index].title!),
+                  subtitle: Text(myNotes[index].description!),
+                  trailing: Wrap(
+                    spacing: 10.0,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.edit),
+                        onPressed: () {
+                          _showAddNote(context, true, index);
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete),
+                        onPressed: () async {
+                          // await DBHelper.instance.delete(myNotes[index].id!);
+                          Note deleteNote = Note(
+                              id: myNotes[index].id,
+                              title: myNotes[index].title,
+                              description: myNotes[index].description,
+                              isDeleted: true,
+                              createdDate: DateTime.now());
+                          await DBHelper.instance.temporaryDelete(deleteNote);
+                          setState(() {
+                            myNotes.removeAt(index);
+                          });
+                        },
+                      )
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -152,7 +180,7 @@ class _NotesListState extends State<NotesList> {
               key: formKey,
               child: SingleChildScrollView(
                   child: Padding(
-                padding: EdgeInsets.only(top: 20),
+                padding: EdgeInsets.symmetric(horizontal: 15, vertical: 20),
                 child: Column(
                   children: [
                     Row(
@@ -167,19 +195,10 @@ class _NotesListState extends State<NotesList> {
                           onTap: () {
                             print('test');
                             if (formKey.currentState!.validate()) {
-                              addNote(isEdit, index);
+                              isEdit != null
+                                  ? editNote(isEdit, index)
+                                  : addNote();
                               Navigator.pop(context);
-                              // Note n = Note(
-                              //     title: noteTitleController.text,
-                              //     description: noteDescriptionController.text);
-                              // setState(() {
-                              //   isEdit == null
-                              //       ? myNotes.add(n)
-                              //       : myNotes[index] = n;
-                              // });
-                              // noteTitleController.clear();
-                              // noteDescriptionController.clear();
-                              // Navigator.pop(context);
                             }
                           },
                           child: Text('Save',
